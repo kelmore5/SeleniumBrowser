@@ -46,5 +46,5 @@ and then the function `SeleniumBrowser.browse_to_url` to do the actual browsing.
 
 ## Extra Links
 
-[Selenium](https://www.seleniumhq.org/)
-[Selenium Python Docs](http://selenium-python.readthedocs.io/)
+- [Selenium](https://www.seleniumhq.org/)
+- [Selenium Python Docs](http://selenium-python.readthedocs.io/)
