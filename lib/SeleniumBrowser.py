@@ -6,7 +6,7 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
 
-from lib.XPathLookupProps import XPathLookupProps
+from ..lib.XPathLookupProps import XPathLookupProps
 
 
 class SeleniumBrowser(object):
@@ -28,7 +28,7 @@ class SeleniumBrowser(object):
 
         Now, I mentioned the above because the main purpose of this helper class is an attempt to
         take out some of the guess work when using a headless browser (selenium or otherwise).
-        Since web pages change at a rate faster than bullets these days, the two main helper
+        Since web pages change at a rate faster than jets these days, the two main helper
         functions "check_presence_of_element" and "check_absence_of_element" are used before
         selecting elements on an HTML page.
 
