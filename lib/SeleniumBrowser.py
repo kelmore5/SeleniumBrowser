@@ -1,8 +1,9 @@
 import os
+from typing import Callable, Any
 
 from pyvirtualdisplay import Display
 from selenium import webdriver
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
 
@@ -50,6 +51,11 @@ class SeleniumBrowser(object):
         At the time, this is all I need.
     """
 
+    display: Display
+    path_to_chromedriver: str
+    browser: webdriver.Chrome
+    options: webdriver.ChromeOptions
+
     def __init__(self, path_to_chromedriver: str = os.getcwd() + "/chromedriver",
                  chrome_options: webdriver.ChromeOptions = webdriver.ChromeOptions()):
         """
@@ -78,9 +84,14 @@ class SeleniumBrowser(object):
         self.options = chrome_options  # Save options to global variable
 
         # Initialize internal selenium browser with given chromedriver path and chrome_options
+        self.path_to_chromedriver = path_to_chromedriver
         self.browser = webdriver.Chrome(path_to_chromedriver, chrome_options=chrome_options)
 
-    def quit(self):
+    def restart_browser(self) -> None:
+        self.browser.quit()
+        self.browser = webdriver.Chrome(self.path_to_chromedriver, chrome_options=self.options)
+
+    def quit(self) -> None:
         """
         Stops the instance of Chrome and remove the virtual display that was created
         for this session
@@ -88,13 +99,13 @@ class SeleniumBrowser(object):
         self.browser.quit()
         self.display.stop()
 
-    def get_browser(self):
+    def get_browser(self) -> webdriver.Chrome:
         """
         :return: The headless browser session via Selenium
         """
         return self.browser
 
-    def browse_to_url(self, url: str, props: XPathLookupProps, absent: bool = False):
+    def browse_to_url(self, url: str, props: XPathLookupProps, absent: bool = False) -> bool:
         """
         Sets the current url to the one passed. Will run a search command using props
         and return when the page has fully loaded.
@@ -110,13 +121,44 @@ class SeleniumBrowser(object):
             for the presence of an element on the page being loaded. Default: False
         :return: True if page was loaded successfully, False otherwise
         """
-        self.browser.get(url)
+        try:
+            self.browser.get(url)
+        except WebDriverException:
+            return False
+        except Exception as e:
+            print(e)
+            print("Something went wrong. The page " + url + " could not be loaded. Check logs")
+            return False
+
         if absent:
             return self.check_absence_of_element(props)
         else:
             return self.check_presence_of_element(props)
 
-    def check_presence_of_element(self, props: XPathLookupProps):
+    def check_presence_helper(self, presence_function: Callable[[str, str], Any], props: XPathLookupProps) -> bool:
+        """
+        A helper function for checking the presence (or absence) of an element within a web page
+        via Selenium browser.
+
+        See functions check_presence_of_element and check_absence_of_element below for more details
+
+        :param presence_function: Function from expected conditions (ec) of Selenium browser, should be
+             either ec.presence_of_element_located or ec.invisibility_of_element_located. Used to check
+             for absence or presence of an element within a web page after a given time
+        :param props: The elements being searched for on the page, see class XPathLookupProps
+        :return: True if page was loaded successfully, False otherwise
+        """
+        try:
+            element_check = presence_function((props.html_element_type, props.search_param), )
+            WebDriverWait(self.browser, props.delay).until(element_check)
+            if props.done_message is not None:
+                print(self.browser.title + " is ready" if props.done_message == "" else props.done_message)
+        except TimeoutException:
+            print("Loading took too much time...")
+            return False
+        return True
+
+    def check_presence_of_element(self, props: XPathLookupProps) -> bool:
         """
         Checks for the presence of an element within the web page. Used before accessing
         specific parts of a site or to confirm a page has fully loaded
@@ -124,17 +166,9 @@ class SeleniumBrowser(object):
         :param props: The properties of the HTML element to search for
         :return: True if element is present, False otherwise
         """
-        try:
-            element_present = ec.presence_of_element_located((props.html_element_type, props.search_param))
-            WebDriverWait(self.browser, props.delay).until(element_present)
-            print(self.browser.title + " is ready" if props.done_message == "" else props.done_message)
-        except TimeoutException:
-            print("Loading took too much time...")
-            return False
+        return self.check_presence_helper(ec.presence_of_element_located, props)
 
-        return True
-
-    def check_absence_of_element(self, props: XPathLookupProps):
+    def check_absence_of_element(self, props: XPathLookupProps) -> bool:
         """
         Contrary to check_presence_of_element (above), checks for the absence of an element
         within the web page. Can be helpful when pop-ups are involved.
@@ -144,12 +178,4 @@ class SeleniumBrowser(object):
         :param props: The properties of the HTML element to search for
         :return: True if element is absent, False otherwise
         """
-        try:
-            element_present = ec.invisibility_of_element_located((props.html_element_type, props.search_param))
-            WebDriverWait(self.browser, props.delay).until(element_present)
-            print(self.browser.title + " is ready" if props.done_message == "" else props.done_message)
-        except TimeoutException:
-            print("Loading took too much time...")
-            return False
-
-        return True
+        return self.check_presence_helper(ec.invisibility_of_element_located, props)

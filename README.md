@@ -36,10 +36,12 @@ I do not have specific plans right now to expand this project further but may in
 
 Once the dependencies are installed, importing is as simple as:
 
-    import SeleniumBrowser from SeleniumBrowser
+```python
+from SeleniumBrowser import SeleniumBrowser
 
-    path_to_chromedriver = '/home/user/chromedriver'
-    browser = new SeleniumBrowser(path_to_chromedriver)
+path_to_chromedriver = '/home/user/chromedriver'
+browser = new SeleniumBrowser(path_to_chromedriver)
+```
 
 Afterwards, use the `XPathLookupProps` class to create property classes for page request checks
 and then the function `SeleniumBrowser.browse_to_url` to do the actual browsing.
