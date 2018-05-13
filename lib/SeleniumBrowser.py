@@ -1,7 +1,6 @@
 import os
 from typing import Callable, Any
 
-from pyvirtualdisplay import Display
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver.support import expected_conditions as ec
@@ -51,7 +50,6 @@ class SeleniumBrowser(object):
         At the time, this is all I need.
     """
 
-    display: Display
     path_to_chromedriver: str
     browser: webdriver.Chrome
     options: webdriver.ChromeOptions
@@ -79,8 +77,7 @@ class SeleniumBrowser(object):
         :param chrome_options?: Optional - A Selenium.ChromeOptions class, used to set
             options for Chrome's headless browser
         """
-        self.display = Display(visible=0, size=(800, 600))  # Create the virtual display for the browser
-        self.display.start()  # Start the display
+        chrome_options.add_argument('headless')
         self.options = chrome_options  # Save options to global variable
 
         # Initialize internal selenium browser with given chromedriver path and chrome_options
@@ -97,7 +94,6 @@ class SeleniumBrowser(object):
         for this session
         """
         self.browser.quit()
-        self.display.stop()
 
     def get_browser(self) -> webdriver.Chrome:
         """
@@ -135,6 +131,7 @@ class SeleniumBrowser(object):
         else:
             return self.check_presence_of_element(props)
 
+    # noinspection PyArgumentList
     def check_presence_helper(self, presence_function: Callable[[str, str], Any], props: XPathLookupProps) -> bool:
         """
         A helper function for checking the presence (or absence) of an element within a web page
