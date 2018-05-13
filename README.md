@@ -11,12 +11,9 @@ through a site.
 The class takes two arguments: The path to an installed version of chromedriver (required) and
 a ChromeOptions class that can be created via Selenium (optional).
 
-Once initialized, the class will create a virtual display for chrome to reside in using pyvirtualdisplay and
-Xfvb, and then create a headless (virtual/invisible) chrome browser within that display. Afterwards,
+Once initialized, the class will create a headless (virtual/invisible) chrome browser. Afterwards,
 the user can use the class to browse to different URLs while also easily checking for loaded pages
 and required elements.
-
-And that's it! Simple but handy.
 
 I do not have specific plans right now to expand this project further but may in the future as needed.
 
@@ -25,12 +22,10 @@ I do not have specific plans right now to expand this project further but may in
 ### Dependencies
 
 - python 3.5 or 3.6
-- pyvirtualdisplay
 - [selenium](http://selenium-python.readthedocs.io/installation.html)
-- [Xvfb](https://www.x.org/archive/X11R7.6/doc/man/man1/Xvfb.1.xhtml) (May not be necessary - check install of pyvirtualdisplay)
 - [ChromeDriver](https://sites.google.com/a/chromium.org/chromedriver/)
 
-*pyvirtualdisplay and Xvfb are used to create the headless display, selenium and chromedriver are used for the actual browsing
+*Selenium and chromedriver are used for headless browsing
 
 ### Import
 
