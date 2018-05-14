@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 
 
 class XPathLookupProps(object):
@@ -11,7 +11,7 @@ class XPathLookupProps(object):
     delay: Optional[int]
     done_message: Optional[str]
 
-    def __init__(self, html_element_type: str, search_param: str, delay: int = 30, done_message: str = ""):
+    def __init__(self, html_element_type: str, search_param: str, delay: int = 30, done_message: Union[str, None] = ""):
         """
         Initializes the property class.
 
