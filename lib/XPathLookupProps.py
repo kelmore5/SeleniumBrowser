@@ -4,7 +4,7 @@ from typing import Optional, Union
 class XPathLookupProps(object):
     """
     A property class to carry out xpath searches within a web page. Used for functions
-    within the SeleniumBrowser class above
+    within the SeleniumBrowser class
     """
     html_element_type: str
     search_param: str

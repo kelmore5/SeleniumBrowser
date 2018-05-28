@@ -1,11 +1,13 @@
 import os
-from typing import Callable, Any
+from typing import Callable, Any, Union
 
 from selenium import webdriver
-from selenium.common.exceptions import TimeoutException, WebDriverException
+from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException
+from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
 
+from ..lib.GetElementProps import GetElementProps
 from ..lib.XPathLookupProps import XPathLookupProps
 
 
@@ -176,3 +178,26 @@ class SeleniumBrowser(object):
         :return: True if element is absent, False otherwise
         """
         return self.check_presence_helper(ec.invisibility_of_element_located, props)
+
+    def get_html_element(self, props: GetElementProps, element: WebElement = None) -> Union[None, WebElement]:
+        """
+        Returns an html element from the browser. If element is specified, will search
+        for the html element with element. Otherwise, searches are conducted on the browser
+
+        :param props: A class to dictate what kind of search to perform
+        :param element: Optional - An HTML element to search. Will search within
+            internal browser if not specified
+        :return: The HTML element or None is none is found
+        """
+        browser = self.browser if element is None else element
+        try:
+            if props.by_id is not None:
+                return browser.find_elements_by_id(props.by_id)
+            elif props.by_class is not None:
+                return browser.find_elements_by_class_name(props.by_class)
+            elif props.by_xpath is not None:
+                return browser.find_elements_by_xpath(props.by_xpath)
+            else:
+                return None
+        except NoSuchElementException:
+            return None
