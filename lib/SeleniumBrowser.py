@@ -198,6 +198,8 @@ class SeleniumBrowser(object):
                 output = browser.find_elements_by_id(props.by_id)
             elif props.by_class is not None:
                 output = browser.find_elements_by_class_name(props.by_class)
+            elif props.by_tag is not None:
+                output = browser.find_elements_by_tag_name(props.by_tag)
             elif props.by_xpath is not None:
                 output = browser.find_elements_by_xpath(props.by_xpath)
 
