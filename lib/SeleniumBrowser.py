@@ -3,6 +3,7 @@ from typing import Callable, Any, Union, List
 
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException
+from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
@@ -179,7 +180,7 @@ class SeleniumBrowser(object):
         """
         return self.check_presence_helper(ec.invisibility_of_element_located, props)
 
-    def get_html_elements(self, props: GetElementProps, element: WebElement = None) -> \
+    def get_html_elements(self, props: GetElementProps, element: Union[WebElement, WebDriver] = None) -> \
             Union[None, List[WebElement], WebElement]:
         """
         Returns an html element from the browser. If element is specified, will search
