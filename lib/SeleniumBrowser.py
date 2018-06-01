@@ -81,6 +81,7 @@ class SeleniumBrowser(object):
             options for Chrome's headless browser
         """
         chrome_options.add_argument('headless')
+        chrome_options.add_argument('ignore-certificate-errors')
         self.options = chrome_options  # Save options to global variable
 
         # Initialize internal selenium browser with given chromedriver path and chrome_options
@@ -121,7 +122,7 @@ class SeleniumBrowser(object):
         :return: True if page was loaded successfully, False otherwise
         """
         try:
-            self.browser.get(url)
+            self.browser.get(url.replace('https', 'http'))
         except WebDriverException:
             return False
         except Exception as e:
