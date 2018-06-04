@@ -89,7 +89,10 @@ class SeleniumBrowser(object):
 
         # Initialize internal selenium browser with given chromedriver path and chrome_options
         self.path_to_chromedriver = path_to_chromedriver
-        self.browser = webdriver.Chrome(path_to_chromedriver, chrome_options=chrome_options)
+        self.start_browser()
+
+    def start_browser(self) -> None:
+        self.browser = webdriver.Chrome(self.path_to_chromedriver, chrome_options=self.options)
 
     def restart_browser(self) -> None:
         self.browser.quit()
