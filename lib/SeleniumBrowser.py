@@ -58,7 +58,8 @@ class SeleniumBrowser(object):
     options: webdriver.ChromeOptions
 
     def __init__(self, path_to_chromedriver: str = os.getcwd() + "/chromedriver",
-                 chrome_options: webdriver.ChromeOptions = webdriver.ChromeOptions()):
+                 chrome_options: webdriver.ChromeOptions = webdriver.ChromeOptions(),
+                 headless: bool = True):
         """
         Initializes the SeleniumBrowser class, ie creates an instance of selenium using
         Chrome with default properties to start a headless session.
@@ -80,7 +81,9 @@ class SeleniumBrowser(object):
         :param chrome_options?: Optional - A Selenium.ChromeOptions class, used to set
             options for Chrome's headless browser
         """
-        chrome_options.add_argument('headless')
+        if headless:
+            chrome_options.add_argument('headless')
+
         chrome_options.add_argument('ignore-certificate-errors')
         self.options = chrome_options  # Save options to global variable
 
