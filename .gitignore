@@ -1,0 +1,9 @@
+.idea/
+
+README.md
+chromedriver
+temp*.txt
+*.pyc
+
+output/
+input/
