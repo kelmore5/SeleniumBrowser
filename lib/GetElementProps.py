@@ -28,13 +28,3 @@ class GetElementProps(object):
         self.by_id = by_id
         self.by_tag = by_tag
         self.by_xpath = by_xpath
-
-    def get_ref(self):
-        if self.by_id is not None:
-            return self.by_id
-        elif self.by_class is not None:
-            return self.by_class
-        elif self.by_tag is not None:
-            return self.by_tag
-        else:
-            return self.by_xpath
