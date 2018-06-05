@@ -1,6 +1,7 @@
 from typing import Optional, Union
 
 
+# TODO: Create input for error message
 class XPathLookupProps(object):
     """
     A property class to carry out xpath searches within a web page. Used for functions
@@ -25,3 +26,9 @@ class XPathLookupProps(object):
         self.search_param = search_param
         self.delay = delay
         self.done_message = done_message
+
+    def __copy__(self) -> 'XPathLookupProps':
+        props: XPathLookupProps = XPathLookupProps(self.html_element_type, self.search_param)
+        props.delay = self.delay
+        props.done_message = self.done_message
+        return props

@@ -91,6 +91,17 @@ class SeleniumBrowser(object):
         self.path_to_chromedriver = path_to_chromedriver
         self.start_browser()
 
+    def show_browser(self):
+        if 'headless' in self.options.arguments:
+            self.options.arguments.remove('headless')
+        self.options.set_headless(False)
+        self.restart_browser()
+
+    def hide_browser(self):
+        self.options.add_argument('headless')
+        self.options.set_headless(True)
+        self.restart_browser()
+
     def start_browser(self) -> None:
         self.browser = webdriver.Chrome(self.path_to_chromedriver, chrome_options=self.options)
 
@@ -165,6 +176,7 @@ class SeleniumBrowser(object):
             return False
         return True
 
+    # TODO: Change so function takes in GetElementProps rather than XPathLookupProps
     def check_presence_of_element(self, props: XPathLookupProps) -> bool:
         """
         Checks for the presence of an element within the web page. Used before accessing
