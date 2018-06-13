@@ -6,19 +6,16 @@ from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
 
-module_path: str = ''
+selenium_module_path: str = ''
 try:
-    module_path = os.path.dirname(os.path.realpath(__file__))
+    selenium_module_path = os.path.dirname(os.path.realpath(__file__))
 except NameError:
-    module_path = os.path.dirname(os.path.abspath(sys.argv[0]))
+    selenium_module_path = os.path.dirname(os.path.abspath(sys.argv[0]))
 
-for x in range(2):
-    module_path = os.path.dirname(module_path)
+sys.path.append(os.path.dirname(selenium_module_path))
 
-sys.path.append(module_path)
-
-from lib.database.models.Errors import Errors
-from lib.SeleniumBrowser.lib.GetElementProps import GetElementProps
+from lib.GetElementProps import GetElementProps
+from lib.utils.lib.db.Errors import Errors
 
 
 # TODO: Create input for error message
@@ -60,7 +57,7 @@ class XPathLookupProps(object):
     def __repr__(self):
         return self.__str__()
 
-    def update_from_props(self, props: GetElementProps):
+    def update_from_props(self, props: 'GetElementProps'):
         if props.by_id is not None:
             self.html_element_type = By.ID
         elif props.by_class is not None:

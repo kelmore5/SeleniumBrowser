@@ -10,22 +10,19 @@ from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
 
-# TODO: Definitely have to change this - Going to have to export Error Handler to github or something
-module_path: str = ''
+selenium_module_path: str = ''
 try:
-    module_path = os.path.dirname(os.path.realpath(__file__))
+    selenium_module_path = os.path.dirname(os.path.realpath(__file__))
 except NameError:
-    module_path = os.path.dirname(os.path.abspath(sys.argv[0]))
+    selenium_module_path = os.path.dirname(os.path.abspath(sys.argv[0]))
 
-for x in range(2):
-    module_path = os.path.dirname(module_path)
+sys.path.append(os.path.dirname(selenium_module_path))
 
-sys.path.append(module_path)
-
-from lib.SeleniumBrowser.lib.GetElementProps import GetElementProps
-from lib.SeleniumBrowser.lib.XPathLookupProps import XPathLookupProps
-from lib.database.models.ErrorHandler import ErrorHandler, Logger, ErrorCodes
-from lib.database.models.Errors import Errors
+from lib.GetElementProps import GetElementProps
+from lib.XPathLookupProps import XPathLookupProps
+from lib.utils.lib.errors.ErrorCodes import ErrorCodes
+from lib.utils.lib.errors.ErrorHandler import ErrorHandler, Logger
+from lib.utils.lib.db.Errors import Errors
 from lib.utils.lib.Files import Files
 from lib.utils.lib.Arrays import Arrays
 
@@ -109,7 +106,7 @@ class SeleniumBrowser(object):
         :param chrome_options?: Optional - A Selenium.ChromeOptions class, used to set
             options for Chrome's headless browser
         """
-        self.errors = errors if errors is not None else ErrorHandler(module_path + '/logs')
+        self.errors = errors if errors is not None else ErrorHandler(selenium_module_path + '/logs')
         self.logger = self.errors
 
         if headless:
@@ -133,6 +130,7 @@ class SeleniumBrowser(object):
 
     def load_cookies(self, url: str, load_check: XPathLookupProps, file: Files) -> bool:
         if self.browse_to_url(url, load_check):
+            # TODO: Figure out what error pickle throughs and catch appropriately
             try:
                 cookies: List[dict] = pickle.load(open(file.full_path, 'rb'))
             except Exception as e:
@@ -287,7 +285,6 @@ class SeleniumBrowser(object):
 
         See functions check_presence_of_element and check_absence_of_element below for more details
 
-        :param default_error:
         :param presence_function: Function from expected conditions (ec) of Selenium browser, should be
              either ec.presence_of_element_located or ec.invisibility_of_element_located. Used to check
              for absence or presence of an element within a web page after a given time
@@ -297,7 +294,7 @@ class SeleniumBrowser(object):
 
         try:
             WebDriverWait(self.browser, props.delay).until(presence_function)
-            if propsdone_message is not None:
+            if props.done_message is not None:
                 self.logger.output(self.browser.title + " is ready" if props.done_message == "" else props.done_message)
         except TimeoutException:
             self.errors.err(props.error)
