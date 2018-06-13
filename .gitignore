@@ -5,5 +5,6 @@ chromedriver
 temp*.txt
 *.pyc
 
+compact/
 output/
 input/

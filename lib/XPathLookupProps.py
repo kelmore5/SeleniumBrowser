@@ -1,4 +1,24 @@
-from typing import Optional, Union
+import os
+import sys
+from typing import Optional, Union, Callable, List
+
+from selenium.webdriver.chrome.webdriver import WebDriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webelement import WebElement
+
+module_path: str = ''
+try:
+    module_path = os.path.dirname(os.path.realpath(__file__))
+except NameError:
+    module_path = os.path.dirname(os.path.abspath(sys.argv[0]))
+
+for x in range(2):
+    module_path = os.path.dirname(module_path)
+
+sys.path.append(module_path)
+
+from lib.database.models.Errors import Errors
+from lib.SeleniumBrowser.lib.GetElementProps import GetElementProps
 
 
 # TODO: Create input for error message
@@ -11,8 +31,11 @@ class XPathLookupProps(object):
     search_param: str
     delay: Optional[int]
     done_message: Optional[str]
+    error: Optional[Errors]
 
-    def __init__(self, html_element_type: str, search_param: str, delay: int = 30, done_message: Union[str, None] = ""):
+    def __init__(self, html_element_type: Optional[str] = By.XPATH, search_param: Optional[str] = '//',
+                 props: Optional[GetElementProps] = None, delay: int = 30,
+                 done_message: Optional[str] = '', error: Optional[Errors] = None):
         """
         Initializes the property class.
 
@@ -26,6 +49,37 @@ class XPathLookupProps(object):
         self.search_param = search_param
         self.delay = delay
         self.done_message = done_message
+        self.error = error
+
+        if props is not None:
+            self.update_from_props(props)
+
+    def __str__(self):
+        return 'XPathLookupProps<{}>'.format(str({'element': self.html_element_type, 'search': self.search_param}))
+
+    def __repr__(self):
+        return self.__str__()
+
+    def update_from_props(self, props: GetElementProps):
+        if props.by_id is not None:
+            self.html_element_type = By.ID
+        elif props.by_class is not None:
+            self.html_element_type = By.CLASS_NAME
+        elif props.by_tag is not None:
+            self.html_element_type = By.TAG_NAME
+        else:
+            self.html_element_type = By.XPATH
+
+        self.search_param = props.get_ref()
+
+    def find_element(self, driver: Union[WebDriver, WebElement]) -> Callable[[], WebElement]:
+        return lambda: driver.find_element(self.html_element_type, self.search_param)
+
+    def find_elements(self, driver: Union[WebDriver, WebElement]) -> Callable[[], List[WebElement]]:
+        return lambda: driver.find_elements(self.html_element_type, self.search_param)
+
+    def get_element_lookup(self):
+        return self.html_element_type, self.search_param
 
     def __copy__(self) -> 'XPathLookupProps':
         props: XPathLookupProps = XPathLookupProps(self.html_element_type, self.search_param)

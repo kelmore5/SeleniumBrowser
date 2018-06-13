@@ -1,5 +1,7 @@
 import os
-from typing import Callable, Any, Union, List
+import pickle
+import sys
+from typing import Callable, Any, Union, List, Optional, Tuple
 
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException
@@ -8,10 +10,29 @@ from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
 
-from ..lib.GetElementProps import GetElementProps
-from ..lib.XPathLookupProps import XPathLookupProps
+# TODO: Definitely have to change this - Going to have to export Error Handler to github or something
+module_path: str = ''
+try:
+    module_path = os.path.dirname(os.path.realpath(__file__))
+except NameError:
+    module_path = os.path.dirname(os.path.abspath(sys.argv[0]))
+
+for x in range(2):
+    module_path = os.path.dirname(module_path)
+
+sys.path.append(module_path)
+
+from lib.SeleniumBrowser.lib.GetElementProps import GetElementProps
+from lib.SeleniumBrowser.lib.XPathLookupProps import XPathLookupProps
+from lib.database.models.ErrorHandler import ErrorHandler, Logger, ErrorCodes
+from lib.database.models.Errors import Errors
+from lib.utils.lib.Files import Files
+from lib.utils.lib.Arrays import Arrays
+
+Point = Tuple[int, int]
 
 
+# TODO: Probably going to have to go back to using XVFB....Some pages just don't load right without a display
 class SeleniumBrowser(object):
     """
         A class to extend the functionality of Selenium's headless web browser,
@@ -52,14 +73,21 @@ class SeleniumBrowser(object):
 
         At the time, this is all I need.
     """
+    default_pos: Point = (100, 50)
+
+    width: int = 800
+    height: int = 800
 
     path_to_chromedriver: str
     browser: webdriver.Chrome
     options: webdriver.ChromeOptions
 
-    def __init__(self, path_to_chromedriver: str = os.getcwd() + "/chromedriver",
+    logger: Logger
+    errors: ErrorHandler
+
+    def __init__(self, path_to_chromedriver: str = Files.concat(os.getcwd(), 'chromedriver'),
                  chrome_options: webdriver.ChromeOptions = webdriver.ChromeOptions(),
-                 headless: bool = True):
+                 headless: bool = True, errors: ErrorHandler = None):
         """
         Initializes the SeleniumBrowser class, ie creates an instance of selenium using
         Chrome with default properties to start a headless session.
@@ -81,23 +109,106 @@ class SeleniumBrowser(object):
         :param chrome_options?: Optional - A Selenium.ChromeOptions class, used to set
             options for Chrome's headless browser
         """
+        self.errors = errors if errors is not None else ErrorHandler(module_path + '/logs')
+        self.logger = self.errors
+
         if headless:
             chrome_options.add_argument('headless')
 
         chrome_options.add_argument('ignore-certificate-errors')
+        chrome_options.add_argument('--disable-extensions')
+        chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_argument('--no-sandbox')
         self.options = chrome_options  # Save options to global variable
 
         # Initialize internal selenium browser with given chromedriver path and chrome_options
         self.path_to_chromedriver = path_to_chromedriver
         self.start_browser()
 
-    def show_browser(self):
+    def save_cookies(self, url: str, load_check: XPathLookupProps, file: Files) -> bool:
+        if self.browse_to_url(url, load_check):
+            pickle.dump(self.browser.get_cookies(), open(file.full_path, 'wb'))
+            return True
+        return False
+
+    def load_cookies(self, url: str, load_check: XPathLookupProps, file: Files) -> bool:
+        if self.browse_to_url(url, load_check):
+            try:
+                cookies: List[dict] = pickle.load(open(file.full_path, 'rb'))
+            except Exception as e:
+                file.remove_if_exists()
+                return False
+
+            for cookie in cookies:
+                self.browser.add_cookie(cookie)
+            return True
+        return False
+
+    @staticmethod
+    def get_chrome_position(point: Point) -> str:
+        return '--window-position={},{}'.format(str(point[0]), str(point[1]))
+
+    def move_screen_helper(self, pos: Point = None, size: Point = None, reload: bool = False, tiny: bool = False):
+        pos: Point = self.default_pos if pos is None else pos
+        if size is None and tiny:
+            size = (50, 50)
+        elif size is None:
+            size = (self.width, self.height)
+
+        self.move_reload(pos, reload)
+        self.browser.set_window_size(size[0], size[1])
+
+    def off_screen(self, reload: bool = False, tiny: bool = False):
+        pos: Point = (-32000, -32000)
+        self.move_screen_helper(pos=pos, reload=reload, tiny=tiny)
+
+    def on_screen(self, reload: bool = False, tiny: bool = False):
+        self.move_screen_helper(reload=reload, tiny=tiny)
+
+    def move_reload(self, point: Point = None, reload: bool = False):
+        self.clear_window_position()
+
+        point = self.default_pos if point is None else point
+        if reload:
+            self.options.arguments.append(SeleniumBrowser.get_chrome_position(point))
+            self.restart_browser()
+
+        self.browser.set_window_position(point[0], point[1])
+
+    def tiny(self, reload: bool = False):
+        self.move_screen_helper(reload=reload, tiny=True)
+
+    def normal(self, reload: bool = False):
+        self.move_screen_helper(reload=reload, tiny=False)
+
+    def show_browser(self, tiny: bool = False):
+        self.clear_window_position()
+
         if 'headless' in self.options.arguments:
             self.options.arguments.remove('headless')
         self.options.set_headless(False)
+
+        point: Point = self.default_pos
+        self.options.add_argument(SeleniumBrowser.get_chrome_position(point))
+
         self.restart_browser()
 
+        self.browser.set_window_position(point[0], point[1])
+        self.tiny() if tiny else self.normal()
+
+    def clear_window_position(self):
+        args: List[str] = self.options.arguments
+        check: str = 'window-position'
+        remove_idxs: List[int] = []
+        for idx in range(len(args)):
+            arg: str = args[idx]
+            if check in arg:
+                remove_idxs.append(idx)
+        Arrays.remove_indexes(self.options.arguments, remove_idxs)
+
     def hide_browser(self):
+        self.clear_window_position()
+
         self.options.add_argument('headless')
         self.options.set_headless(True)
         self.restart_browser()
@@ -122,7 +233,10 @@ class SeleniumBrowser(object):
         """
         return self.browser
 
-    def browse_to_url(self, url: str, props: XPathLookupProps, absent: bool = False) -> bool:
+    # TODO: Remove props all together and just use present function
+    # TODO: Maybe add four methods for browse - just to clarify (like find_elements vs find_elements_tag_name)
+    def browse_to_url(self, url: str, props: Optional[XPathLookupProps] = None, absent: Optional[bool] = False,
+                      present_function: Callable[[], bool] = None) -> bool:
         """
         Sets the current url to the one passed. Will run a search command using props
         and return when the page has fully loaded.
@@ -130,6 +244,7 @@ class SeleniumBrowser(object):
         Helpful when using a headless browser to go to a page and need a specific
         link or button on the page being loaded
 
+        :param present_function:
         :param url: The url to load
         :param props: Specifies what to look for on the page to be loaded to determine when
             it has fully been loaded. Especially helpful when trying to access a specific
@@ -138,45 +253,109 @@ class SeleniumBrowser(object):
             for the presence of an element on the page being loaded. Default: False
         :return: True if page was loaded successfully, False otherwise
         """
+        default_error: Errors = ErrorCodes.selenium_err({
+            'input_key': url,
+            'uid': 'Web Page Load Failed - {}'.format(url),
+            'error_code': ErrorCodes.selenium.connect,
+            'message': 'The page at {} could not be loaded'.format(url)
+        })
+
         try:
-            self.browser.get(url.replace('https', 'http'))
+            self.browser.get(url)
         except WebDriverException:
             return False
         except Exception as e:
-            print(e)
-            print("Something went wrong. The page " + url + " could not be loaded. Check logs")
+            default_error.message += '\n{}\n'.format(e)
+            self.errors.err(default_error)
             return False
 
-        if absent:
-            return self.check_absence_of_element(props)
+        if present_function is not None:
+            return present_function()
+        elif props is not None:
+            if absent:
+                return self.check_absence_of_element(props)
+            else:
+                return self.check_presence_of_element(props)
         else:
-            return self.check_presence_of_element(props)
+            return False
 
     # noinspection PyArgumentList
-    def check_presence_helper(self, presence_function: Callable[[str, str], Any], props: XPathLookupProps) -> bool:
+    def check_presence_helper(self, presence_function: Any, props: XPathLookupProps) -> bool:
         """
         A helper function for checking the presence (or absence) of an element within a web page
         via Selenium browser.
 
         See functions check_presence_of_element and check_absence_of_element below for more details
 
+        :param default_error:
         :param presence_function: Function from expected conditions (ec) of Selenium browser, should be
              either ec.presence_of_element_located or ec.invisibility_of_element_located. Used to check
              for absence or presence of an element within a web page after a given time
         :param props: The elements being searched for on the page, see class XPathLookupProps
         :return: True if page was loaded successfully, False otherwise
         """
+
         try:
-            element_check = presence_function((props.html_element_type, props.search_param), )
-            WebDriverWait(self.browser, props.delay).until(element_check)
-            if props.done_message is not None:
-                print(self.browser.title + " is ready" if props.done_message == "" else props.done_message)
+            WebDriverWait(self.browser, props.delay).until(presence_function)
+            if propsdone_message is not None:
+                self.logger.output(self.browser.title + " is ready" if props.done_message == "" else props.done_message)
         except TimeoutException:
-            print("Loading took too much time...")
+            self.errors.err(props.error)
             return False
         return True
 
-    # TODO: Change so function takes in GetElementProps rather than XPathLookupProps
+    # TODO: Maybe move to utils class?
+    @staticmethod
+    def check_results(statements: List[Callable[[], Any]]) -> bool:
+        result: bool = False
+        for statement in statements:
+            result = result or statement()
+            if result:
+                break
+        return result
+
+    @staticmethod
+    def check_all_results(statements: List[Callable[[], Any]]) -> bool:
+        result: bool = True
+        for statement in statements:
+            result = result and statement()
+            if not result:
+                break
+        return result
+
+    # TODO: Create check_presence_of_one/all helper method
+    def check_presence_of_one(self, props: List[XPathLookupProps],
+                              main_prop: Optional[XPathLookupProps] = None) -> bool:
+        main_prop = props[0] if main_prop is None else main_prop
+        lookup_statements: List[Callable[[], List[WebElement]]] = [x.find_elements(self.browser) for x in props]
+        check_statement: Callable[[], bool] = lambda driver: SeleniumBrowser.check_results(lookup_statements)
+
+        if main_prop.error is None:
+            main_prop.error = ErrorCodes.selenium_err({
+                'input_key': self.browser.title,
+                'uid': 'No Elements Found - {}'.format(main_prop.search_param),
+                'message': 'None of the elements within the given list of {} elements were found on the page. '
+                           'Starting element search ID: {}'.format(len(props), main_prop.search_param)
+            })
+
+        return self.check_presence_helper(check_statement, main_prop)
+
+    def check_presence_of_all(self, props: List[XPathLookupProps],
+                              main_prop: Optional[XPathLookupProps] = None) -> bool:
+        main_prop = props[0] if main_prop is None else main_prop
+        lookup_statements: List[Callable[[], List[WebElement]]] = [x.find_elements for x in props]
+        check_statement: Callable[[], bool] = lambda driver: SeleniumBrowser.check_all_results(lookup_statements)
+
+        if main_prop.error is None:
+            main_prop.error = ErrorCodes.selenium_err({
+                'input_key': self.browser.title,
+                'uid': 'Some Elements Not Found - {}'.format(main_prop.search_param),
+                'message': 'One or more of the elements within the given list of {} elements were not found on the '
+                           'page. Starting element search ID: {}'.format(len(props), main_prop.search_param)
+            })
+
+        return self.check_presence_helper(check_statement, main_prop)
+
     def check_presence_of_element(self, props: XPathLookupProps) -> bool:
         """
         Checks for the presence of an element within the web page. Used before accessing
@@ -185,7 +364,17 @@ class SeleniumBrowser(object):
         :param props: The properties of the HTML element to search for
         :return: True if element is present, False otherwise
         """
-        return self.check_presence_helper(ec.presence_of_element_located, props)
+
+        if props.error is None:
+            props.error = ErrorCodes.selenium_err({
+                'input_key': self.browser.title,
+                'uid': 'Element was not found - {}'.format(props.search_param),
+                'message': 'The element with XPath {} at {} could not be found after {} '
+                           'seconds on the web page'.format(props.search_param, self.browser.title, props.delay)
+            })
+
+        check_statement: Callable[[], bool] = ec.presence_of_element_located(props.get_element_lookup())
+        return self.check_presence_helper(check_statement, props)
 
     def check_absence_of_element(self, props: XPathLookupProps) -> bool:
         """
@@ -197,7 +386,17 @@ class SeleniumBrowser(object):
         :param props: The properties of the HTML element to search for
         :return: True if element is absent, False otherwise
         """
-        return self.check_presence_helper(ec.invisibility_of_element_located, props)
+
+        if props.error is None:
+            props.error = ErrorCodes.selenium_err({
+                'input_key': self.browser.title,
+                'uid': 'Element was found - {}'.format(props.search_param),
+                'message': 'The element with XPath {} at {} was found after waiting {} '
+                           'seconds on the web page'.format(props.search_param, self.browser.title, props.delay)
+            })
+
+        check_statement: Callable[[], bool] = ec.invisibility_of_element_located(props.get_element_lookup())
+        return self.check_presence_helper(check_statement, props)
 
     def get_html_elements(self, props: GetElementProps, element: Union[WebElement, WebDriver] = None) -> \
             Union[None, List[WebElement], WebElement]:
