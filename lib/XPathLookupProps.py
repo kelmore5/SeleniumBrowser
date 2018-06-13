@@ -13,10 +13,11 @@ except NameError:
     selenium_project_path = os.path.dirname(os.path.abspath(sys.argv[0]))
 
 selenium_project_path = os.path.dirname(selenium_project_path)
-sys.path.append(os.path.dirname(selenium_project_path))
+path_append: str = os.path.dirname(selenium_project_path)
+sys.path.append(path_append) if path_append not in sys.path else 0
 
-from SeleniumBrowser.lib.database.models.Errors import Errors
-from SeleniumBrowser.lib.SeleniumBrowser.lib.GetElementProps import GetElementProps
+from SeleniumBrowser.lib.utils.lib.db.Errors import Errors
+from SeleniumBrowser.lib.GetElementProps import GetElementProps
 
 
 # TODO: Create input for error message
