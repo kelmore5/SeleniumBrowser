@@ -10,23 +10,25 @@ from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
 
-selenium_module_path: str = ''
+selenium_project_path: str = ''
 try:
-    selenium_module_path = os.path.dirname(os.path.realpath(__file__))
+    selenium_project_path = os.path.dirname(os.path.realpath(__file__))
 except NameError:
-    selenium_module_path = os.path.dirname(os.path.abspath(sys.argv[0]))
+    selenium_project_path = os.path.dirname(os.path.abspath(sys.argv[0]))
 
-sys.path.append(os.path.dirname(selenium_module_path))
+selenium_project_path = os.path.dirname(selenium_project_path)
+sys.path.append(os.path.dirname(selenium_project_path))
 
-from lib.GetElementProps import GetElementProps
-from lib.XPathLookupProps import XPathLookupProps
-from lib.utils.lib.errors.ErrorCodes import ErrorCodes
-from lib.utils.lib.errors.ErrorHandler import ErrorHandler, Logger
-from lib.utils.lib.db.Errors import Errors
-from lib.utils.lib.Files import Files
-from lib.utils.lib.Arrays import Arrays
+from SeleniumBrowser.lib.GetElementProps import GetElementProps
+from SeleniumBrowser.lib.XPathLookupProps import XPathLookupProps
+from SeleniumBrowser.lib.utils.lib.errors.ErrorCodes import ErrorCodes
+from SeleniumBrowser.lib.utils.lib.errors.ErrorHandler import ErrorHandler, Logger
+from SeleniumBrowser.lib.utils.lib.db.Errors import Errors
+from SeleniumBrowser.lib.utils.lib.Files import Files
+from SeleniumBrowser.lib.utils.lib.Arrays import Arrays
 
 Point = Tuple[int, int]
+WebType = Union[WebElement, WebDriver]
 
 
 # TODO: Probably going to have to go back to using XVFB....Some pages just don't load right without a display
@@ -106,7 +108,8 @@ class SeleniumBrowser(object):
         :param chrome_options?: Optional - A Selenium.ChromeOptions class, used to set
             options for Chrome's headless browser
         """
-        self.errors = errors if errors is not None else ErrorHandler(selenium_module_path + '/logs')
+        self.errors = \
+            errors if errors is not None else ErrorHandler(Files.concat(selenium_project_path, 'lib', 'logs'))
         self.logger = self.errors
 
         if headless:
@@ -395,7 +398,7 @@ class SeleniumBrowser(object):
         check_statement: Callable[[], bool] = ec.invisibility_of_element_located(props.get_element_lookup())
         return self.check_presence_helper(check_statement, props)
 
-    def get_html_elements(self, props: GetElementProps, element: Union[WebElement, WebDriver] = None) -> \
+    def get_html_elements(self, props: GetElementProps, element: Optional[WebType] = None) -> \
             Union[None, List[WebElement], WebElement]:
         """
         Returns an html element from the browser. If element is specified, will search
