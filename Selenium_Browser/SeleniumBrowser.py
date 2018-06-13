@@ -10,23 +10,22 @@ from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
 
-selenium_project_path: str = ''
+selenium_module_path: str = ''
 try:
-    selenium_project_path = os.path.dirname(os.path.realpath(__file__))
+    selenium_module_path = os.path.dirname(os.path.realpath(__file__))
 except NameError:
-    selenium_project_path = os.path.dirname(os.path.abspath(sys.argv[0]))
+    selenium_module_path = os.path.dirname(os.path.abspath(sys.argv[0]))
 
-selenium_project_path = os.path.dirname(selenium_project_path)
-path_append: str = os.path.dirname(selenium_project_path)
+path_append: str = os.path.dirname(selenium_module_path)
 sys.path.append(path_append) if path_append not in sys.path else 0
 
-from SeleniumBrowser.lib.GetElementProps import GetElementProps
-from SeleniumBrowser.lib.XPathLookupProps import XPathLookupProps
-from SeleniumBrowser.lib.utils.lib.errors.ErrorCodes import ErrorCodes
-from SeleniumBrowser.lib.utils.lib.errors.ErrorHandler import ErrorHandler, Logger
-from SeleniumBrowser.lib.utils.lib.db.Errors import Errors
-from SeleniumBrowser.lib.utils.lib.Files import Files
-from SeleniumBrowser.lib.utils.lib.Arrays import Arrays
+from Selenium_Browser.GetElementProps import GetElementProps
+from Selenium_Browser.XPathLookupProps import XPathLookupProps
+from Selenium_Browser.utils.utils.errors.ErrorCodes import ErrorCodes
+from Selenium_Browser.utils.utils.errors.ErrorHandler import ErrorHandler, Logger
+from Selenium_Browser.utils.utils.db.Errors import Errors
+from Selenium_Browser.utils.utils.Files import Files
+from Selenium_Browser.utils.utils.Arrays import Arrays
 
 Point = Tuple[int, int]
 WebType = Union[WebElement, WebDriver]
@@ -110,7 +109,7 @@ class SeleniumBrowser(object):
             options for Chrome's headless browser
         """
         self.errors = \
-            errors if errors is not None else ErrorHandler(Files.concat(selenium_project_path, 'lib', 'logs'))
+            errors if errors is not None else ErrorHandler(Files.concat(selenium_module_path, 'lib', 'logs'))
         self.logger = self.errors
 
         if headless:

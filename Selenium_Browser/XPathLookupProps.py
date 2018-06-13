@@ -6,18 +6,17 @@ from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
 
-selenium_project_path: str = ''
+selenium_module_path: str = ''
 try:
-    selenium_project_path = os.path.dirname(os.path.realpath(__file__))
+    selenium_module_path = os.path.dirname(os.path.realpath(__file__))
 except NameError:
-    selenium_project_path = os.path.dirname(os.path.abspath(sys.argv[0]))
+    selenium_module_path = os.path.dirname(os.path.abspath(sys.argv[0]))
 
-selenium_project_path = os.path.dirname(selenium_project_path)
-path_append: str = os.path.dirname(selenium_project_path)
+path_append: str = os.path.dirname(selenium_module_path)
 sys.path.append(path_append) if path_append not in sys.path else 0
 
-from SeleniumBrowser.lib.utils.lib.db.Errors import Errors
-from SeleniumBrowser.lib.GetElementProps import GetElementProps
+from Selenium_Browser.utils.utils.db.Errors import Errors
+from Selenium_Browser.GetElementProps import GetElementProps
 
 
 # TODO: Create input for error message
