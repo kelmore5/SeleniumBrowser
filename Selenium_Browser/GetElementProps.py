@@ -38,3 +38,7 @@ class GetElementProps(object):
             return self.by_tag
         else:
             return self.by_xpath
+
+    @staticmethod
+    def parent():
+        return GetElementProps(by_xpath='.//')

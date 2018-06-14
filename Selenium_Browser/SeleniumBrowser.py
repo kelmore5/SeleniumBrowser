@@ -29,6 +29,7 @@ from Selenium_Browser.utils.utils.Arrays import Arrays
 
 Point = Tuple[int, int]
 WebType = Union[WebElement, WebDriver]
+WebLookup = Union[None, List[WebElement], WebElement]
 
 
 # TODO: Probably going to have to go back to using XVFB....Some pages just don't load right without a display
@@ -398,8 +399,7 @@ class SeleniumBrowser(object):
         check_statement: Callable[[], bool] = ec.invisibility_of_element_located(props.get_element_lookup())
         return self.check_presence_helper(check_statement, props)
 
-    def get_html_elements(self, props: GetElementProps, element: Optional[WebType] = None) -> \
-            Union[None, List[WebElement], WebElement]:
+    def get_html_elements(self, props: GetElementProps, element: Optional[WebType] = None) -> WebLookup:
         """
         Returns an html element from the browser. If element is specified, will search
         for the html element with element. Otherwise, searches are conducted on the browser
@@ -429,3 +429,9 @@ class SeleniumBrowser(object):
                 return output
         except NoSuchElementException:
             return None
+
+    def get_html(self, element: WebElement = None):
+        if element is not None:
+            return element.find_element_by_xpath(".//*").get_attribute("outerHTML")
+        else:
+            return self.browser.page_source

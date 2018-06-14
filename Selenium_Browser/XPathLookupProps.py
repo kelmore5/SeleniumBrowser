@@ -58,6 +58,10 @@ class XPathLookupProps(object):
     def __repr__(self):
         return self.__str__()
 
+    @staticmethod
+    def any_element_check() -> 'XPathLookupProps':
+        return XPathLookupProps(By.XPATH, '//*')
+
     def update_from_props(self, props: 'GetElementProps'):
         if props.by_id is not None:
             self.html_element_type = By.ID
