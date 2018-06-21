@@ -12,4 +12,4 @@ sys.path.append(path_append) if path_append not in sys.path else 0
 
 from Selenium_Browser.GetElementProps import GetElementProps
 from Selenium_Browser.XPathLookupProps import XPathLookupProps
-from Selenium_Browser.SeleniumBrowser import SeleniumBrowser
+from Selenium_Browser.SeleniumBrowser import SeleniumBrowser, WebLookup, WebType
