@@ -15,8 +15,8 @@ except NameError:
 path_append: str = os.path.dirname(selenium_module_path)
 sys.path.append(path_append) if path_append not in sys.path else 0
 
-from Selenium_Browser.utils.utils.db.Errors import Errors
-from Selenium_Browser.GetElementProps import GetElementProps
+from Selenium_Browser import GetElementProps
+from Selenium_Browser.utils.utils.db import Errors
 
 
 # TODO: Create input for error message

@@ -20,13 +20,10 @@ except NameError:
 path_append: str = os.path.dirname(selenium_module_path)
 sys.path.append(path_append) if path_append not in sys.path else 0
 
-from Selenium_Browser.GetElementProps import GetElementProps
-from Selenium_Browser.XPathLookupProps import XPathLookupProps
-from Selenium_Browser.utils.utils.errors.ErrorCodes import ErrorCodes
-from Selenium_Browser.utils.utils.errors.ErrorHandler import ErrorHandler, Logger
-from Selenium_Browser.utils.utils.db.Errors import Errors
-from Selenium_Browser.utils.utils.Files import Files
-from Selenium_Browser.utils.utils.Arrays import Arrays
+from Selenium_Browser import GetElementProps, XPathLookupProps
+from Selenium_Browser.utils.utils import Files, Arrays
+from Selenium_Browser.utils.utils.errors import ErrorCodes, Logger, ErrorHandler
+from Selenium_Browser.utils.utils.db import Errors
 
 Point = Tuple[int, int]
 WebType = Union[WebElement, WebDriver]
