@@ -4,7 +4,8 @@ import sys
 from typing import Callable, Any, Union, List, Optional, Tuple
 
 from selenium import webdriver
-from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException
+from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException, \
+    StaleElementReferenceException
 from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as ec
@@ -217,10 +218,12 @@ class SeleniumBrowser(object):
 
     def start_browser(self) -> None:
         self.browser = webdriver.Chrome(self.path_to_chromedriver, chrome_options=self.options)
+        # self.browser = webdriver.PhantomJS()
 
     def restart_browser(self) -> None:
         self.browser.quit()
         self.browser = webdriver.Chrome(self.path_to_chromedriver, chrome_options=self.options)
+        # self.browser = webdriver.PhantomJS()
 
     def quit(self) -> None:
         """
@@ -264,22 +267,26 @@ class SeleniumBrowser(object):
 
         try:
             self.browser.get(url)
-        except WebDriverException:
+            self.load_frame_elements(delay=5)
+        except WebDriverException as e:
+            self.restart_browser()
+            print(e)
             return False
         except Exception as e:
             default_error.message += '\n{}\n'.format(e)
-            self.errors.err(default_error)
+            self.errors.output_err(default_error)
             return False
+
+        self.browser.switch_to.default_content()
 
         if present_function is not None:
             return present_function()
-        elif props is not None:
+        else:
+            props = XPathLookupProps.any_element_check() if props is None else props
             if absent:
                 return self.check_absence_of_element(props)
             else:
                 return self.check_presence_of_element(props)
-        else:
-            return False
 
     # noinspection PyArgumentList
     def check_presence_helper(self, presence_function: Any, props: XPathLookupProps) -> bool:
@@ -295,13 +302,12 @@ class SeleniumBrowser(object):
         :param props: The elements being searched for on the page, see class XPathLookupProps
         :return: True if page was loaded successfully, False otherwise
         """
-
         try:
             WebDriverWait(self.browser, props.delay).until(presence_function)
             if props.done_message is not None:
                 self.logger.output(self.browser.title + " is ready" if props.done_message == "" else props.done_message)
         except TimeoutException:
-            self.errors.err(props.error)
+            self.errors.output_err(props.error)
             return False
         return True
 
@@ -399,7 +405,8 @@ class SeleniumBrowser(object):
         check_statement: Callable[[], bool] = ec.invisibility_of_element_located(props.get_element_lookup())
         return self.check_presence_helper(check_statement, props)
 
-    def get_html_elements(self, props: GetElementProps, element: Optional[WebType] = None) -> WebLookup:
+    def get_html_elements(self, props: GetElementProps, element: Optional[WebType] = None,
+                          ignore_list: Optional[bool] = False) -> WebLookup:
         """
         Returns an html element from the browser. If element is specified, will search
         for the html element with element. Otherwise, searches are conducted on the browser
@@ -425,13 +432,31 @@ class SeleniumBrowser(object):
                 return None
             elif len(output) == 1:
                 return output[0]
+            elif ignore_list:
+                return output[0]
             else:
                 return output
         except NoSuchElementException:
             return None
 
-    def get_html(self, element: WebElement = None):
+    def get_html(self, element: Optional[WebElement] = None):
         if element is not None:
-            return element.find_element_by_xpath(".//*").get_attribute("outerHTML")
+            return element.get_attribute("outerHTML")
         else:
-            return self.browser.page_source
+            get_html: WebElement = self.browser.find_element_by_xpath('//*')
+            return self.browser.page_source if get_html is None else get_html.get_attribute('outerHTML')
+
+    def load_frame_elements(self, delay: int = 20):
+        frames: List[WebElement] = Arrays.listify(self.get_html_elements(GetElementProps(by_tag='frame')))
+        frames += Arrays.listify(self.get_html_elements(GetElementProps(by_tag='iframe')))
+        if len(frames) == 0:
+            return True
+
+        for frame in frames:
+            try:
+                wait = ec.frame_to_be_available_and_switch_to_it(frame)
+                WebDriverWait(self.browser, delay).until(wait)
+            except StaleElementReferenceException:
+                pass
+            except TimeoutException:
+                pass
