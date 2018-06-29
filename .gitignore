@@ -1,10 +1,15 @@
 .idea/
 
-README.md
-chromedriver
-temp*.txt
+temp*
+*temp
+*.db
 *.pyc
 
+backup/
+build/
+chromedriver/
 compact/
-output/
+database/keys/
 input/
+logs/
+output/

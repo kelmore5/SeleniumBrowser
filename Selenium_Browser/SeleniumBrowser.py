@@ -1,7 +1,7 @@
 import os
 import pickle
 import sys
-from typing import Callable, Any, Union, List, Optional, Tuple
+from typing import Callable, Any, Union, List, Optional, Tuple, Type
 
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException, \
@@ -24,21 +24,22 @@ try:
     from .GetElementProps import GetElementProps
     from .XPathLookupProps import XPathLookupProps
     from .utils.utils import Files, Arrays
-    from .utils.utils.errors.ErrorHandler import Logger, ErrorHandler
+    from .utils.utils.errors.Logger import LogStamps, Logger
+    from .utils.utils.errors.ErrorHandler import ErrorHandler, ErrorCodes
     from .utils.utils.db import Errors
 except ValueError:
     from Selenium_Browser.GetElementProps import GetElementProps
     from Selenium_Browser.XPathLookupProps import XPathLookupProps
     from Selenium_Browser.utils.utils import Files, Arrays
-    from Selenium_Browser.utils.utils.errors import ErrorCodes
-    from Selenium_Browser.utils.utils.errors.ErrorHandler import Logger, ErrorHandler
+    from Selenium_Browser.utils.utils.errors.Logger import Logger, LogStamps
+    from Selenium_Browser.utils.utils.errors.ErrorHandler import ErrorCodes, ErrorHandler
     from Selenium_Browser.utils.utils.db import Errors
 except ModuleNotFoundError:
     from Selenium_Browser.GetElementProps import GetElementProps
     from Selenium_Browser.XPathLookupProps import XPathLookupProps
     from Selenium_Browser.utils.utils import Files, Arrays
-    from Selenium_Browser.utils.utils.errors import ErrorCodes
-    from Selenium_Browser.utils.utils.errors.ErrorHandler import Logger, ErrorHandler
+    from Selenium_Browser.utils.utils.errors.Logger import Logger, LogStamps
+    from Selenium_Browser.utils.utils.errors.ErrorHandler import ErrorCodes, ErrorHandler
     from Selenium_Browser.utils.utils.db import Errors
 
 Point = Tuple[int, int]
@@ -96,12 +97,15 @@ class SeleniumBrowser(object):
     browser: webdriver.Chrome
     options: webdriver.ChromeOptions
 
-    logger: Logger
-    errors: ErrorHandler
+    errors: Type[Errors]
+    error_codes: ErrorCodes
 
-    def __init__(self, path_to_chromedriver: str = Files.concat(os.getcwd(), 'chromedriver'),
+    logger: Logger
+    error_handler: ErrorHandler
+
+    def __init__(self, errors: Type[Errors], path_to_chromedriver: str = Files.concat(os.getcwd(), 'chromedriver'),
                  chrome_options: webdriver.ChromeOptions = webdriver.ChromeOptions(),
-                 headless: bool = True, errors: ErrorHandler = None):
+                 headless: bool = True, error_handler: ErrorHandler = None):
         """
         Initializes the SeleniumBrowser class, ie creates an instance of selenium using
         Chrome with default properties to start a headless session.
@@ -123,9 +127,14 @@ class SeleniumBrowser(object):
         :param chrome_options?: Optional - A Selenium.ChromeOptions class, used to set
             options for Chrome's headless browser
         """
-        self.errors = \
-            errors if errors is not None else ErrorHandler(Files.concat(selenium_module_path, 'lib', 'logs'))
-        self.logger = self.errors
+        self.errors = errors
+        self.error_codes = ErrorCodes(self.errors)
+        if error_handler is None:
+            self.error_handler = ErrorHandler(Files.concat(selenium_module_path, 'logs'), errors)
+        else:
+            self.error_handler = error_handler
+
+        self.logger = self.error_handler
 
         if headless:
             chrome_options.add_argument('headless')
@@ -146,12 +155,13 @@ class SeleniumBrowser(object):
             return True
         return False
 
+    # noinspection PyBroadException
     def load_cookies(self, url: str, load_check: XPathLookupProps, file: Files) -> bool:
         if self.browse_to_url(url, load_check):
             # TODO: Figure out what error pickle throughs and catch appropriately
             try:
                 cookies: List[dict] = pickle.load(open(file.full_path, 'rb'))
-            except Exception as e:
+            except Exception:
                 file.remove_if_exists()
                 return False
 
@@ -200,7 +210,7 @@ class SeleniumBrowser(object):
     def show_browser(self, tiny: bool = False):
         self.clear_window_position()
 
-        if 'headless' in self.options.arguments:
+        while 'headless' in self.options.arguments:
             self.options.arguments.remove('headless')
         self.options.set_headless(False)
 
@@ -271,7 +281,7 @@ class SeleniumBrowser(object):
             for the presence of an element on the page being loaded. Default: False
         :return: True if page was loaded successfully, False otherwise
         """
-        default_error: Errors = ErrorCodes.selenium_err({
+        default_error: Errors = self.error_codes.selenium_err({
             'input_key': url,
             'uid': 'Web Page Load Failed - {}'.format(url),
             'error_code': ErrorCodes.selenium.connect,
@@ -287,7 +297,7 @@ class SeleniumBrowser(object):
             return False
         except Exception as e:
             default_error.message += '\n{}\n'.format(e)
-            self.errors.output_err(default_error)
+            self.error_handler.output_err(default_error)
             return False
 
         self.browser.switch_to.default_content()
@@ -320,7 +330,7 @@ class SeleniumBrowser(object):
             if props.done_message is not None:
                 self.logger.output(self.browser.title + " is ready" if props.done_message == "" else props.done_message)
         except TimeoutException:
-            self.errors.output_err(props.error)
+            self.error_handler.output_err(props.error)
             return False
         return True
 
@@ -351,7 +361,7 @@ class SeleniumBrowser(object):
         check_statement: Callable[[], bool] = lambda driver: SeleniumBrowser.check_results(lookup_statements)
 
         if main_prop.error is None:
-            main_prop.error = ErrorCodes.selenium_err({
+            main_prop.error = self.error_codes.selenium_err({
                 'input_key': self.browser.title,
                 'uid': 'No Elements Found - {}'.format(main_prop.search_param),
                 'message': 'None of the elements within the given list of {} elements were found on the page. '
@@ -367,7 +377,7 @@ class SeleniumBrowser(object):
         check_statement: Callable[[], bool] = lambda driver: SeleniumBrowser.check_all_results(lookup_statements)
 
         if main_prop.error is None:
-            main_prop.error = ErrorCodes.selenium_err({
+            main_prop.error = self.error_codes.selenium_err({
                 'input_key': self.browser.title,
                 'uid': 'Some Elements Not Found - {}'.format(main_prop.search_param),
                 'message': 'One or more of the elements within the given list of {} elements were not found on the '
@@ -386,7 +396,7 @@ class SeleniumBrowser(object):
         """
 
         if props.error is None:
-            props.error = ErrorCodes.selenium_err({
+            props.error = self.error_codes.selenium_err({
                 'input_key': self.browser.title,
                 'uid': 'Element was not found - {}'.format(props.search_param),
                 'message': 'The element with XPath {} at {} could not be found after {} '
@@ -408,7 +418,7 @@ class SeleniumBrowser(object):
         """
 
         if props.error is None:
-            props.error = ErrorCodes.selenium_err({
+            props.error = self.error_codes.selenium_err({
                 'input_key': self.browser.title,
                 'uid': 'Element was found - {}'.format(props.search_param),
                 'message': 'The element with XPath {} at {} was found after waiting {} '

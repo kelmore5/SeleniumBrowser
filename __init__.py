@@ -1,1 +1,1 @@
-import Selenium_Browser
+from .Selenium_Browser import *
