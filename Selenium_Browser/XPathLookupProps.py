@@ -6,13 +6,13 @@ from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
 
-selenium_module_path: str = ''
+module_path: str = ''
 try:
-    selenium_module_path = os.path.dirname(os.path.realpath(__file__))
+    module_path = os.path.dirname(os.path.realpath(__file__))
 except NameError:
-    selenium_module_path = os.path.dirname(os.path.abspath(sys.argv[0]))
+    module_path = os.path.dirname(os.path.abspath(sys.argv[0]))
 
-path_append: str = os.path.dirname(selenium_module_path)
+path_append: str = os.path.dirname(module_path)
 sys.path.append(path_append) if path_append not in sys.path else 0
 
 try:
@@ -27,11 +27,14 @@ except ModuleNotFoundError:
 
 
 # TODO: Create input for error message
+# TODO: At some point, probably going to have to combine GetElementProps and this
 class XPathLookupProps(object):
     """
     A property class to carry out xpath searches within a web page. Used for functions
     within the SeleniumBrowser class
     """
+    check_absence: bool
+
     html_element_type: str
     search_param: str
     delay: Optional[int]
@@ -40,7 +43,8 @@ class XPathLookupProps(object):
 
     def __init__(self, html_element_type: Optional[str] = By.XPATH, search_param: Optional[str] = '//',
                  props: Optional[GetElementProps] = None, delay: int = 30,
-                 done_message: Optional[str] = '', error: Optional[Errors] = None):
+                 done_message: Optional[str] = '', error: Optional[Errors] = None,
+                 check_absence: Optional[bool] = False):
         """
         Initializes the property class.
 
@@ -50,6 +54,8 @@ class XPathLookupProps(object):
         :param done_message: A message to be printed once the page has fully loaded.
             Default: "'Page Title' has loaded"
         """
+        self.check_absence = check_absence
+
         self.html_element_type = html_element_type
         self.search_param = search_param
         self.delay = delay

@@ -1,50 +1,97 @@
 import os
 import pickle
 import sys
-from typing import Callable, Any, Union, List, Optional, Tuple, Type
+from typing import Callable, Any, Union, List, Optional, Tuple, Type, Dict
 
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException, \
     StaleElementReferenceException
 from selenium.webdriver.chrome.webdriver import WebDriver
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
 
-selenium_module_path: str = ''
+module_path: str = ''
 try:
-    selenium_module_path = os.path.dirname(os.path.realpath(__file__))
+    module_path = os.path.dirname(os.path.realpath(__file__))
 except NameError:
-    selenium_module_path = os.path.dirname(os.path.abspath(sys.argv[0]))
+    module_path = os.path.dirname(os.path.abspath(sys.argv[0]))
 
-path_append: str = os.path.dirname(selenium_module_path)
+path_append: str = os.path.dirname(module_path)
 sys.path.append(path_append) if path_append not in sys.path else 0
 
 try:
+    from .HTMLPageElements import HTMLPageElements
     from .GetElementProps import GetElementProps
     from .XPathLookupProps import XPathLookupProps
-    from .utils.utils import Files, Arrays
+    from .utils.utils import Files, Arrays, Utils, Jsons
     from .utils.utils.errors.Logger import LogStamps, Logger
     from .utils.utils.errors.ErrorHandler import ErrorHandler, ErrorCodes
     from .utils.utils.db import Errors
 except ValueError:
-    from Selenium_Browser.GetElementProps import GetElementProps
-    from Selenium_Browser.XPathLookupProps import XPathLookupProps
-    from Selenium_Browser.utils.utils import Files, Arrays
-    from Selenium_Browser.utils.utils.errors.Logger import Logger, LogStamps
-    from Selenium_Browser.utils.utils.errors.ErrorHandler import ErrorCodes, ErrorHandler
-    from Selenium_Browser.utils.utils.db import Errors
-except ModuleNotFoundError:
-    from Selenium_Browser.GetElementProps import GetElementProps
-    from Selenium_Browser.XPathLookupProps import XPathLookupProps
-    from Selenium_Browser.utils.utils import Files, Arrays
+    from Selenium_Browser import HTMLPageElements, GetElementProps, XPathLookupProps
+    from Selenium_Browser.utils.utils import Files, Arrays, Utils, Jsons
     from Selenium_Browser.utils.utils.errors.Logger import Logger, LogStamps
     from Selenium_Browser.utils.utils.errors.ErrorHandler import ErrorCodes, ErrorHandler
     from Selenium_Browser.utils.utils.db import Errors
 
 Point = Tuple[int, int]
 WebType = Union[WebElement, WebDriver]
-WebLookup = Union[None, List[WebElement], WebElement]
+WebLookup = Union[None, List[WebElement], WebElement, str]
+GetElementResp = Union[WebElement, str, None]
+GetAllElementsResp = Union[List[GetElementResp], GetElementResp]
+ElementLookup = Dict[str, GetElementResp]
+OWebElement = Optional[WebElement]
+
+
+class SeleniumBrowserProps(object):
+    module_path: str
+    path_to_chromedriver: str
+    options: webdriver.ChromeOptions
+
+    errors: Type[Errors]
+    error_codes: ErrorCodes
+
+    logger: ErrorHandler
+
+    def __init__(self, main_module_path: str, errors: Type[Errors],
+                 path_to_chromedriver: Optional[str] = None,
+                 chrome_options: Optional[webdriver.ChromeOptions] = webdriver.ChromeOptions(),
+                 headless: Optional[bool] = True, error_handler: Optional[ErrorHandler] = None):
+        self.module_path = main_module_path
+        self.path_to_chromedriver = \
+            Utils.first_non_none(path_to_chromedriver, SeleniumBrowser.get_chromedriver_path(self.module_path))
+
+        self.errors = errors
+        self.error_codes = ErrorCodes(self.errors)
+        self.logger = \
+            Utils.first_non_none(error_handler, ErrorHandler(Files.concat(self.module_path, 'logs'), self.errors))
+
+        if headless:
+            chrome_options.add_argument('headless')
+
+        chrome_options.add_argument('ignore-certificate-errors')
+        chrome_options.add_argument('--disable-extensions')
+        chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_argument('--no-sandbox')
+        self.options = chrome_options  # Save options to global variable
+
+
+class BrowseReq(object):
+    url: str
+    props: XPathLookupProps
+    present_function: Callable[[], bool]
+
+    def __init__(self, url: str, props: Optional[XPathLookupProps] = None, present_function: Callable[[], bool] = None):
+        self.url = url
+        self.props = Utils.first_non_none(props, XPathLookupProps.any_element_check())
+        self.present_function = present_function
+
+
+class BrowseElementsReq(BrowseReq):
+    def __init__(self, page_elements: HTMLPageElements):
+        super().__init__(page_elements.url, props=page_elements.load_check)
 
 
 # TODO: Probably going to have to go back to using XVFB....Some pages just don't load right without a display
@@ -100,12 +147,9 @@ class SeleniumBrowser(object):
     errors: Type[Errors]
     error_codes: ErrorCodes
 
-    logger: Logger
-    error_handler: ErrorHandler
+    logger: ErrorHandler
 
-    def __init__(self, errors: Type[Errors], path_to_chromedriver: str = Files.concat(os.getcwd(), 'chromedriver'),
-                 chrome_options: webdriver.ChromeOptions = webdriver.ChromeOptions(),
-                 headless: bool = True, error_handler: ErrorHandler = None):
+    def __init__(self, props: SeleniumBrowserProps):
         """
         Initializes the SeleniumBrowser class, ie creates an instance of selenium using
         Chrome with default properties to start a headless session.
@@ -122,42 +166,29 @@ class SeleniumBrowser(object):
         The chrome_options arg can be used to set things like the download location
         for the browser or a proxy if needed.
 
-        :param path_to_chromedriver: The path to the downloaded chromedriver file
-            Default: current_working_directory + '/chromedriver'
         :param chrome_options?: Optional - A Selenium.ChromeOptions class, used to set
             options for Chrome's headless browser
         """
-        self.errors = errors
-        self.error_codes = ErrorCodes(self.errors)
-        if error_handler is None:
-            self.error_handler = ErrorHandler(Files.concat(selenium_module_path, 'logs'), errors)
-        else:
-            self.error_handler = error_handler
-
-        self.logger = self.error_handler
-
-        if headless:
-            chrome_options.add_argument('headless')
-
-        chrome_options.add_argument('ignore-certificate-errors')
-        chrome_options.add_argument('--disable-extensions')
-        chrome_options.add_argument('--disable-gpu')
-        chrome_options.add_argument('--no-sandbox')
-        self.options = chrome_options  # Save options to global variable
+        self.errors = props.errors
+        self.logger = props.logger
+        self.error_codes = self.logger.codes
+        self.options = props.options  # Save options to global variable
 
         # Initialize internal selenium browser with given chromedriver path and chrome_options
-        self.path_to_chromedriver = path_to_chromedriver
+        self.path_to_chromedriver = \
+            Utils.first_non_none(props.path_to_chromedriver, SeleniumBrowser.get_chromedriver_path(props.module_path))
+
         self.start_browser()
 
     def save_cookies(self, url: str, load_check: XPathLookupProps, file: Files) -> bool:
-        if self.browse_to_url(url, load_check):
+        if self.browse_to_url(BrowseReq(url, props=load_check)):
             pickle.dump(self.browser.get_cookies(), open(file.full_path, 'wb'))
             return True
         return False
 
     # noinspection PyBroadException
     def load_cookies(self, url: str, load_check: XPathLookupProps, file: Files) -> bool:
-        if self.browse_to_url(url, load_check):
+        if self.browse_to_url(BrowseReq(url, props=load_check)):
             # TODO: Figure out what error pickle throughs and catch appropriately
             try:
                 cookies: List[dict] = pickle.load(open(file.full_path, 'rb'))
@@ -263,8 +294,7 @@ class SeleniumBrowser(object):
 
     # TODO: Remove props all together and just use present function
     # TODO: Maybe add four methods for browse - just to clarify (like find_elements vs find_elements_tag_name)
-    def browse_to_url(self, url: str, props: Optional[XPathLookupProps] = None, absent: Optional[bool] = False,
-                      present_function: Callable[[], bool] = None) -> bool:
+    def browse_to_url(self, req: BrowseReq) -> bool:
         """
         Sets the current url to the one passed. Will run a search command using props
         and return when the page has fully loaded.
@@ -272,15 +302,11 @@ class SeleniumBrowser(object):
         Helpful when using a headless browser to go to a page and need a specific
         link or button on the page being loaded
 
-        :param present_function:
-        :param url: The url to load
-        :param props: Specifies what to look for on the page to be loaded to determine when
-            it has fully been loaded. Especially helpful when trying to access a specific
-            link or button a page
-        :param absent: If True, checks for the absence of an element on the page being left. If False, checks
-            for the presence of an element on the page being loaded. Default: False
+        :param req:
         :return: True if page was loaded successfully, False otherwise
         """
+        url = req.url
+
         default_error: Errors = self.error_codes.selenium_err({
             'input_key': url,
             'uid': 'Web Page Load Failed - {}'.format(url),
@@ -297,19 +323,17 @@ class SeleniumBrowser(object):
             return False
         except Exception as e:
             default_error.message += '\n{}\n'.format(e)
-            self.error_handler.output_err(default_error)
+            self.logger.output_err(default_error)
             return False
 
         self.browser.switch_to.default_content()
 
-        if present_function is not None:
-            return present_function()
+        if req.present_function is not None:
+            return req.present_function()
         else:
-            props = XPathLookupProps.any_element_check() if props is None else props
-            if absent:
-                return self.check_absence_of_element(props)
-            else:
-                return self.check_presence_of_element(props)
+            props = req.props
+            return self.check_absence_of_element(props) \
+                if props.check_absence else self.check_presence_of_element(props)
 
     # noinspection PyArgumentList
     def check_presence_helper(self, presence_function: Any, props: XPathLookupProps) -> bool:
@@ -330,35 +354,16 @@ class SeleniumBrowser(object):
             if props.done_message is not None:
                 self.logger.output(self.browser.title + " is ready" if props.done_message == "" else props.done_message)
         except TimeoutException:
-            self.error_handler.output_err(props.error)
+            self.logger.output_err(props.error)
             return False
         return True
-
-    # TODO: Maybe move to utils class?
-    @staticmethod
-    def check_results(statements: List[Callable[[], Any]]) -> bool:
-        result: bool = False
-        for statement in statements:
-            result = result or statement()
-            if result:
-                break
-        return result
-
-    @staticmethod
-    def check_all_results(statements: List[Callable[[], Any]]) -> bool:
-        result: bool = True
-        for statement in statements:
-            result = result and statement()
-            if not result:
-                break
-        return result
 
     # TODO: Create check_presence_of_one/all helper method
     def check_presence_of_one(self, props: List[XPathLookupProps],
                               main_prop: Optional[XPathLookupProps] = None) -> bool:
         main_prop = props[0] if main_prop is None else main_prop
         lookup_statements: List[Callable[[], List[WebElement]]] = [x.find_elements(self.browser) for x in props]
-        check_statement: Callable[[], bool] = lambda driver: SeleniumBrowser.check_results(lookup_statements)
+        check_statement: Callable[[], bool] = lambda driver: SeleniumBrowser._check_results(lookup_statements)
 
         if main_prop.error is None:
             main_prop.error = self.error_codes.selenium_err({
@@ -374,7 +379,7 @@ class SeleniumBrowser(object):
                               main_prop: Optional[XPathLookupProps] = None) -> bool:
         main_prop = props[0] if main_prop is None else main_prop
         lookup_statements: List[Callable[[], List[WebElement]]] = [x.find_elements for x in props]
-        check_statement: Callable[[], bool] = lambda driver: SeleniumBrowser.check_all_results(lookup_statements)
+        check_statement: Callable[[], bool] = lambda driver: SeleniumBrowser._check_all_results(lookup_statements)
 
         if main_prop.error is None:
             main_prop.error = self.error_codes.selenium_err({
@@ -394,7 +399,6 @@ class SeleniumBrowser(object):
         :param props: The properties of the HTML element to search for
         :return: True if element is present, False otherwise
         """
-
         if props.error is None:
             props.error = self.error_codes.selenium_err({
                 'input_key': self.browser.title,
@@ -416,7 +420,6 @@ class SeleniumBrowser(object):
         :param props: The properties of the HTML element to search for
         :return: True if element is absent, False otherwise
         """
-
         if props.error is None:
             props.error = self.error_codes.selenium_err({
                 'input_key': self.browser.title,
@@ -428,18 +431,52 @@ class SeleniumBrowser(object):
         check_statement: Callable[[], bool] = ec.invisibility_of_element_located(props.get_element_lookup())
         return self.check_presence_helper(check_statement, props)
 
-    def get_html_elements(self, props: GetElementProps, element: Optional[WebType] = None,
-                          ignore_list: Optional[bool] = False) -> WebLookup:
+    def create_element_lookup(self, key: str, props: GetElementProps, lookup: Optional[dict] = None,
+                              element: OWebElement = None) -> ElementLookup:
+        lookup = Utils.first_non_none(lookup, {})
+        lookup[key] = self.get_html_elements(props, element=element)
+        return lookup
+
+    def create_batch_element_lookup(self, values: List[str], props: List[GetElementProps],
+                                    element: OWebElement = None) -> ElementLookup:
+        Arrays.equal_length(props, values, raise_error=True)
+        lookup: dict = {}
+        for idx in range(len(values)):
+            self.create_element_lookup(values[idx], props[idx], lookup=lookup, element=element)
+        return lookup
+
+    def get_html_elements(self, props: GetElementProps, element: OWebElement = None) -> GetAllElementsResp:
+        elements: GetAllElementsResp = self.get_html_elements_helper(props, element)
+        for element_idx in range(len(elements)):
+            element = elements[element_idx]
+            if props.prefer_text:
+                elements[element_idx] = SeleniumBrowser.get_elements_text(element)
+        return Arrays.delistify(elements)
+
+    def get_batch_html_elements(self, props: List[GetElementProps], element: OWebElement = None) -> GetAllElementsResp:
+        return [self.get_html_elements(x, element) for x in props]
+
+    @staticmethod
+    def get_elements_text(elements: WebLookup):
+        if isinstance(elements, list):
+            for element_idx in range(len(elements)):
+                element = elements[element_idx]
+                if element is not None:
+                    elements[element_idx] = element.text
+        elif elements is not None:
+            elements = elements.text
+        return elements
+
+    def get_html_elements_helper(self, props: GetElementProps, element: OWebElement = None) -> WebLookup:
         """
         Returns an html element from the browser. If element is specified, will search
         for the html element with element. Otherwise, searches are conducted on the browser
 
+        :param element:
         :param props: A class to dictate what kind of search to perform
-        :param element: Optional - An HTML element to search. Will search within
-            internal browser if not specified
         :return: The HTML element or None is none is found
         """
-        browser = self.browser if element is None else element
+        browser = Utils.first_non_none(element, self.browser)
         try:
             output: List[WebElement] = []
             if props.by_id is not None:
@@ -451,11 +488,14 @@ class SeleniumBrowser(object):
             elif props.by_xpath is not None:
                 output = browser.find_elements_by_xpath(props.by_xpath)
 
+            if output is not None and props.grab_attrib is not None:
+                output = [x.get_attribute(props.grab_attrib) for x in output]
+
             if len(output) == 0:
                 return None
             elif len(output) == 1:
-                return output[0]
-            elif ignore_list:
+                return output if props.force_list else output[0]
+            elif props.ignore_list:
                 return output[0]
             else:
                 return output
@@ -470,7 +510,8 @@ class SeleniumBrowser(object):
             return self.browser.page_source if get_html is None else get_html.get_attribute('outerHTML')
 
     def load_frame_elements(self, delay: int = 20):
-        frames: List[WebElement] = Arrays.listify(self.get_html_elements(GetElementProps(by_tag='frame')))
+        frames: List[WebElement] = \
+            Arrays.listify(self.get_html_elements(GetElementProps(by_tag='frame')))
         frames += Arrays.listify(self.get_html_elements(GetElementProps(by_tag='iframe')))
         if len(frames) == 0:
             return True
@@ -483,3 +524,58 @@ class SeleniumBrowser(object):
                 pass
             except TimeoutException:
                 pass
+
+    # TODO: Get rid of noinspection via testing
+    # noinspection PyBroadException
+    def try_submit(self, button: WebElement, javascript: str = None):
+        try:
+            button.click()
+        except Exception:
+            pass
+
+        try:
+            button.send_keys(Keys.ENTER)
+            button.send_keys(Keys.RETURN)
+        except Exception:
+            pass
+
+        if javascript is not None:
+            try:
+                self.browser.execute_script(javascript)
+            except Exception:
+                pass
+
+        try:
+            for x in range(20):
+                button.click()
+        except Exception:
+            return
+
+    # TODO: Maybe move to utils class?
+    @staticmethod
+    def _check_results(statements: List[Callable[[], Any]]) -> bool:
+        result: bool = False
+        for statement in statements:
+            result = result or statement()
+            if result:
+                break
+        return result
+
+    @staticmethod
+    def _check_all_results(statements: List[Callable[[], Any]]) -> bool:
+        result: bool = True
+        for statement in statements:
+            result = result and statement()
+            if not result:
+                break
+        return result
+
+    @staticmethod
+    def get_chromedriver_path(main_module_path: str):
+        plat = sys.platform
+        if plat == 'linux':
+            return Files.concat(main_module_path, 'chromedriver', 'linux')
+        elif plat == 'darwin':
+            return Files.concat(main_module_path, 'chromedriver', 'osx')
+        else:
+            return Files.concat(main_module_path, 'chromedriver', 'windows')
